@@ -104,27 +104,28 @@ dt.commit()
 
 
 @bot.message_handler(commands=['start']) #декоратор, обрабатываем команду старт
-def start(message):
+def start(call):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     botton1 = types.KeyboardButton('Записаться')
     botton2 = types.KeyboardButton('Отменить запись')
-    markup.row(botton1, botton2)
+    markup.add(botton1, botton2)
     botton4 = types.InlineKeyboardButton('Перейти на сайт', url='https://nataxtare.github.io/sweet_lemon_site/')
-    botton5 = types.InlineKeyboardButton('Прайс', callback_data='price')
-    markup.row(botton4, botton5)
-    bot.send_message(message.chat.id, f'Здравствуйте, {message.from_user.first_name}! \nВас приветствует салон красоты Sweety Lemon.', reply_markup=markup)
+
+    botton5 = types.KeyboardButton('Прайс')
+    markup.add(botton4, botton5)
+    bot.send_message(call.chat.id, f'Здравствуйте, {call.from_user.first_name}! \nВас приветствует салон красоты Sweety Lemon.', reply_markup=markup)
 
     ids = cursor.execute("""SELECT userId FROM user""").fetchall()
-    if (str(message.chat.id),) not in ids:
-        bot.send_message(message.chat.id,
+    if (str(call.chat.id),) not in ids:
+        bot.send_message(call.chat.id,
                          'Перед тем, как начать пользоваться ботом, пожалуйста, укажите свои полные фамилию, имя и отчество.')
-        bot.register_next_step_handler(message, new_name)
+        bot.register_next_step_handler(call, new_name)
 
 
 
 @bot.message_handler(content_types=['text'])
-def menu(message):
-    if message.text == 'Записаться':
+def menu(call):
+    if call.text == 'Записаться':
         markup = types.InlineKeyboardMarkup()
         cursor.execute("SELECT DISTINCT date FROM record")
         dates_ = cursor.fetchall()
@@ -137,10 +138,10 @@ def menu(message):
             print(butt)
             button = types.InlineKeyboardButton(date, callback_data=butt)
             markup.add(button)
-        bot.send_message(message.chat.id, 'Выберите день:', reply_markup=markup)
+        bot.send_message(call.chat.id, 'Выберите день:', reply_markup=markup)
 
-    elif message.text == 'Отменить запись':
-        visitor = cursor.execute("SELECT name FROM user WHERE userId = ?", (message.chat.id,)).fetchone()[0]
+    if call.text == 'Отменить запись':
+        visitor = cursor.execute("SELECT name FROM user WHERE userId = ?", (call.chat.id,)).fetchone()[0]
         cursor.execute("SELECT date, service FROM record WHERE visitor = ?", (visitor,))
         markup = types.InlineKeyboardMarkup()
         dates_serv_ = cursor.fetchall()
@@ -155,7 +156,14 @@ def menu(message):
             name_butt = date + ' ' + service
             button = types.InlineKeyboardButton(name_butt, callback_data=butt)
             markup.add(button)
-        bot.send_message(message.chat.id, 'Какую услугу хотите отменить?', reply_markup=markup)
+        bot.send_message(call.chat.id, 'Какую услугу хотите отменить?', reply_markup=markup)
+
+    if call.text == 'Прайс':
+        photo = open('price.jpg', 'rb')
+        bot.send_photo(call.chat.id, photo, caption='Вот наш прайс:')
+    if call.text == 'Перейти на сайт':
+        bot.send_message(call.chat.id, 'https://nataxtare.github.io/sweet_lemon_site/')
+
 
 @bot.callback_query_handler(func=lambda callback: 'date_serv:' in callback.data)
 def callback_cancel(callback):
@@ -203,6 +211,11 @@ def callback_reg(callback):
 
     bot.send_message(callback.message.chat.id, f'Вы успешно записаны {date} на {service}')
 
+@bot.callback_query_handler(func=lambda callback: True)
+def tt(callback):
+    if callback.data == 'price':
+        file = open('./price.jpg', 'rb')
+        bot.send_photo(callback.message.chat.id, file)
 
 def new_name(message):
 
