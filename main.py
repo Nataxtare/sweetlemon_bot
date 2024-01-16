@@ -15,7 +15,6 @@ Base = declarative_base()
 # Определение модели записи
 class Record(Base):
     __tablename__ = 'record'
-    # !!!!!!!!!!!!!
     id = Column(Integer, primary_key=True, autoincrement=True)
     date = Column(String)
     service = Column(String)
@@ -83,13 +82,6 @@ def record_show(date):
     return rasp_list
 
 
-# Удаление данных
-# cursor.execute("DELETE FROM record")
-
-# Удаление таблицы
-# cursor.execute("DROP TABLE record")
-
-
 """insert_record('10.11.23', 'Волосы', 'Петрова Анна Павловна')
 insert_record('20.11.23', 'Волосы', 'Петрова Анна Павловна')
 insert_record('24.11.23', 'Волосы', 'Петрова Анна Павловна')
@@ -132,11 +124,6 @@ insert_record('24.11.23', 'Маникюр', 'Терентьева Мария П�
 insert_record('26.11.23', 'Макияж', 'Цветкова Ольга Алексеевна')
 """
 
-# Вывод таблицы с оплаченными занятиями
-#pays = session.query(Pay).all()
-#for pay in pays:
-#    print(pay.id, pay.name, pay.date, pay.time, pay.amount)
-
 session.commit()
 
 
@@ -176,7 +163,6 @@ def menu(call):
         bot.send_message(call.chat.id, 'Выберите день:', reply_markup=markup)
 
     if call.text == 'Отменить запись':
-        # !!!!!!!!!!!!!!!!
         records = session.query(Record.date, Record.service).filter_by(visitor_id=str(call.chat.id)).all()
 
         markup = types.InlineKeyboardMarkup()
@@ -207,7 +193,6 @@ def callback_cancel(callback):
     master = ''.join(master)
 
     session.query(Record).filter(Record.date == date, Record.service == service, Record.master == master).update(
-        # !!!!!!!!!!
         {"visitor_id": None})
     session.commit()
 
@@ -227,7 +212,6 @@ def callback_dates_show(callback):
         rasp_str += '\n'
     rasp_str += '\nВыберите услугу, на которую хотели бы записаться:'
 
-# !!!!!!!!!!!!!
 
     for i in rasp_list:
         service = i.split(':')[0][1:].split(',')[0]
