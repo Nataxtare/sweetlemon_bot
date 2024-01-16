@@ -5,18 +5,19 @@ from datetime import datetime
 
 from sqlalchemy import create_engine, Column, Integer, String, Boolean,ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, relationship
+from sqlalchemy.orm import sessionmaker, relationship, declarative_base
 
 bot = telebot.TeleBot(token=config.TOKEN) #токен
-engine = create_engine('sqlite:///your_database.db', echo=True)
+engine = create_engine('sqlite:///salon.db', echo=True)
 Base = declarative_base()
 
 
 # Определение модели записи
 class Record(Base):
     __tablename__ = 'record'
-
-    date = Column(String, primary_key=True)
+    # !!!!!!!!!!!!!
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    date = Column(String)
     service = Column(String)
     master = Column(String)
     visitor_id = Column(String, ForeignKey('user.userId'))
@@ -48,12 +49,15 @@ class User(Base):
 
 # Создание таблиц
 Base.metadata.create_all(engine)
+Session = sessionmaker(bind=engine)
+session = Session()
 
-def insert_record(date, service, master, visitor='-'):
+def insert_record(date, service, master, visitor=None):
     # Добавление записи
     new_record = Record(date=date, master=master, service=service,  visitor=visitor)
     session.add(new_record)
     session.commit()
+
 
 def update_visitor(date, service, master, visitor):
     # Поле visitor меняем на данные пользователя
@@ -85,8 +89,8 @@ def record_show(date):
 # Удаление таблицы
 # cursor.execute("DROP TABLE record")
 
-"""
-insert_record('10.11.23', 'Волосы', 'Петрова Анна Павловна')
+
+"""insert_record('10.11.23', 'Волосы', 'Петрова Анна Павловна')
 insert_record('20.11.23', 'Волосы', 'Петрова Анна Павловна')
 insert_record('24.11.23', 'Волосы', 'Петрова Анна Павловна')
 insert_record('26.11.23', 'Волосы', 'Петрова Анна Павловна')
@@ -164,7 +168,7 @@ def menu(call):
         dates = session.query(Record.date.distinct()).all()
 
         for date in dates:
-            date_str = date[0].strftime('%Y-%m-%d')  # Преобразование даты в строку в нужном формате
+            date_str = str(date[0])  # преобразование даты в строку
             butt = 'date:' + date_str
             button = types.InlineKeyboardButton(date_str, callback_data=butt)
             markup.add(button)
@@ -172,10 +176,8 @@ def menu(call):
         bot.send_message(call.chat.id, 'Выберите день:', reply_markup=markup)
 
     if call.text == 'Отменить запись':
-        visitor = session.query(User.name).filter_by(userId=call.chat.id).scalar()
-
-        # Используем SQLAlchemy для выборки записей пользователя
-        records = session.query(Record.date, Record.service).filter_by(visitor_id=visitor).all()
+        # !!!!!!!!!!!!!!!!
+        records = session.query(Record.date, Record.service).filter_by(visitor_id=str(call.chat.id)).all()
 
         markup = types.InlineKeyboardMarkup()
 
@@ -205,7 +207,8 @@ def callback_cancel(callback):
     master = ''.join(master)
 
     session.query(Record).filter(Record.date == date, Record.service == service, Record.master == master).update(
-        {"visitor": "-"})
+        # !!!!!!!!!!
+        {"visitor_id": None})
     session.commit()
 
     bot.send_message(callback.message.chat.id, f'Запись на {date}, "{service}" успешно отменена.')
@@ -224,12 +227,15 @@ def callback_dates_show(callback):
         rasp_str += '\n'
     rasp_str += '\nВыберите услугу, на которую хотели бы записаться:'
 
+# !!!!!!!!!!!!!
+
     for i in rasp_list:
         service = i.split(':')[0][1:].split(',')[0]
         reg = 'reg:' + date + ':' + service
         button = types.InlineKeyboardButton(service, callback_data=reg)
         markup.add(button)
     bot.send_message(callback.message.chat.id, rasp_str, reply_markup=markup)
+
 
 
 @bot.callback_query_handler(func=lambda callback: 'reg:' in callback.data)
@@ -241,7 +247,13 @@ def callback_reg(callback):
     name = session.query(User.name).filter(User.userId == callback.message.chat.id).first()
     name = name[0]
 
-    session.query(Record).filter(Record.service == service, Record.date == date).update({"visitor": name})
+    # Получите ID пользователя из базы данных
+    user_id = session.query(User.userId).filter(User.userId == callback.message.chat.id).scalar()
+
+    # Обновите запись, используя ID пользователя
+    session.query(Record).filter(Record.service == service, Record.date == date).update({"visitor_id": user_id})
+
+
     session.commit()
 
     bot.send_message(callback.message.chat.id, f'Вы успешно записаны {date} на {service}')
